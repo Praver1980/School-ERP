@@ -1,6 +1,4 @@
 import React, { useState, useEffect } from 'react';
-import { collection, getDocs, deleteDoc, collectionGroup } from 'firebase/firestore';
-import { db } from '../services/firebase';
 
 import { User, UserRole, StudentRecord, HouseTeam, Announcement, School as SchoolType, SchoolConfig, MarkEntry, Assignment } from '../types';
 import { getStoredUsers, addUser, updateUser, removeUser, generateId, getStoredStudents, updateStudent, addStudent, removeStudent, getStoredAnnouncements, addAnnouncement, deleteAnnouncement, getStoredSchools, addSchool, removeSchool, updateSchool, getStoredAssignments, addAssignment, deleteAssignment, updateAssignment, getStoredPayments, updatePayment } from '../services/storage';
@@ -280,7 +278,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentPage = 'dashboar
     if (user) {
         setEditingUser(user);
         setFormName(user.name);
-        setFormID(user.schoolID);
+        setFormID(user.loginId);
         setFormPassword(user.password || '');
         setFormSchool(user.schoolName || '');
     }
@@ -293,7 +291,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentPage = 'dashboar
     if (user) {
         setEditingUser(user);
         setFormName(user.name);
-        setFormID(user.schoolID);
+        setFormID(user.loginId);
         setFormPassword(user.password || '');
         setFormSchool(user.schoolName || '');
         
@@ -316,11 +314,11 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentPage = 'dashboar
     setModalType('student');
     if (studentRec) {
         setEditingStudent(studentRec);
-        const linkedUser = users.find(u => u.schoolID === studentRec.schoolID);
+        const linkedUser = users.find(u => u.loginId === studentRec.loginId);
         setEditingUser(linkedUser || null);
 
         setFormName(studentRec.name);
-        setFormID(studentRec.schoolID);
+        setFormID(studentRec.loginId);
         setFormPassword(linkedUser?.password || '');
         setFormSchool(studentRec.schoolName || '');
         
@@ -426,6 +424,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentPage = 'dashboar
           dueDate: assignDueDate,
           targetClass: `${assignGrade}-${assignSection}`,
           schoolName: assignSchool,
+          schoolID: schools.find(s => s.name === assignSchool)?.id,
           authorName: selectedTeacher.name,
           teacherUid: selectedTeacher.uid,
           createdAt: new Date().toISOString()
@@ -521,18 +520,18 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentPage = 'dashboar
     setFormError('');
     if (!formSchool) { setFormError("Please assign a School."); return; }
     
-    const isDuplicate = users.some(u => u.schoolID === formID && u.uid !== editingUser?.uid);
+    const isDuplicate = users.some(u => u.loginId === formID && u.uid !== editingUser?.uid);
     if (isDuplicate) { 
         setFormError("School ID already exists."); 
         return; 
     }
 
     if (editingUser) {
-        updateUser({ ...editingUser, name: formName, schoolID: formID, password: formPassword, schoolName: formSchool });
+        updateUser({ ...editingUser, name: formName, loginId: formID, password: formPassword, schoolName: formSchool, schoolID: schools.find(s => s.name === formSchool)?.id });
     } else {
         addUser({
-            uid: generateId('u'), name: formName, schoolID: formID, password: formPassword,
-            role: UserRole.PRINCIPAL, schoolName: formSchool,
+            uid: generateId('u'), name: formName, loginId: formID, password: formPassword,
+            role: UserRole.PRINCIPAL, schoolName: formSchool, schoolID: schools.find(s => s.name === formSchool)?.id,
             avatarUrl: `https://ui-avatars.com/api/?name=${encodeURIComponent(formName)}&background=3b82f6&color=fff`
         });
     }
@@ -551,7 +550,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentPage = 'dashboar
         fullClass = `${formGrade}-${formSection}`;
     }
 
-    const isDuplicate = users.some(u => u.schoolID === formID && u.uid !== editingUser?.uid);
+    const isDuplicate = users.some(u => u.loginId === formID && u.uid !== editingUser?.uid);
     if (isDuplicate) { 
         setFormError("School ID already exists."); 
         return; 
@@ -559,10 +558,10 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentPage = 'dashboar
 
     const userData: User = {
         uid: editingUser ? editingUser.uid : generateId('u'),
-        name: formName, schoolID: formID, password: formPassword,
+        name: formName, loginId: formID, password: formPassword,
         role: UserRole.TEACHER, assignedClass: fullClass, assignedSubject: formSubject,
         designation: formDesignation, house: formHouse, email: formEmail, contactNumber: formContact,
-        schoolName: formSchool,
+        schoolName: formSchool, schoolID: schools.find(s => s.name === formSchool)?.id,
         gender: formGender,
         avatarUrl: editingUser?.avatarUrl || `https://ui-avatars.com/api/?name=${encodeURIComponent(formName)}&background=8b5cf6&color=fff`
     };
@@ -578,7 +577,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentPage = 'dashboar
     if (!formGrade || !formSection) { setFormError("Please select Class/Section."); return; }
     const fullClass = `${formGrade}-${formSection}`;
     
-    const isDuplicate = users.some(u => u.schoolID === formID && u.uid !== editingUser?.uid);
+    const isDuplicate = users.some(u => u.loginId === formID && u.uid !== editingUser?.uid);
     if (isDuplicate) { 
         setFormError("School ID already exists."); 
         return; 
@@ -586,24 +585,24 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentPage = 'dashboar
 
     if (editingStudent) {
         updateStudent({
-            ...editingStudent, name: formName, schoolID: formID, className: fullClass,
+            ...editingStudent, name: formName, loginId: formID, className: fullClass,
             house: formHouse, studentPost: formPost, dob: formDob, age: parseInt(formAge) || 0,
             gender: formGender, email: formEmail, fatherContact: formFatherContact, motherContact: formMotherContact,
-            schoolName: formSchool
+            schoolName: formSchool, schoolID: schools.find(s => s.name === formSchool)?.id
         });
         if (editingUser) {
-            updateUser({ ...editingUser, name: formName, schoolID: formID, password: formPassword, className: fullClass, email: formEmail, gender: formGender, dob: formDob, schoolName: formSchool });
+            updateUser({ ...editingUser, name: formName, loginId: formID, password: formPassword, className: fullClass, email: formEmail, gender: formGender, dob: formDob, schoolName: formSchool, schoolID: schools.find(s => s.name === formSchool)?.id });
         }
     } else {
         addStudent({
-            id: generateId('s'), name: formName, schoolID: formID, rollNumber: 0, className: fullClass,
+            id: generateId('s'), name: formName, loginId: formID, rollNumber: 0, className: fullClass,
             attendanceToday: null, gradeAverage: 0, house: formHouse, studentPost: formPost, marks: [],
             dob: formDob, age: parseInt(formAge) || 0, gender: formGender, email: formEmail, fatherContact: formFatherContact, motherContact: formMotherContact,
-            schoolName: formSchool
+            schoolName: formSchool, schoolID: schools.find(s => s.name === formSchool)?.id
         });
         addUser({
-            uid: generateId('u'), name: formName, schoolID: formID, password: formPassword,
-            role: UserRole.STUDENT, className: fullClass, email: formEmail, gender: formGender, dob: formDob, schoolName: formSchool,
+            uid: generateId('u'), name: formName, loginId: formID, password: formPassword,
+            role: UserRole.STUDENT, className: fullClass, email: formEmail, gender: formGender, dob: formDob, schoolName: formSchool, schoolID: schools.find(s => s.name === formSchool)?.id,
             avatarUrl: `https://ui-avatars.com/api/?name=${encodeURIComponent(formName)}&background=f59e0b&color=fff`
         });
     }
@@ -624,7 +623,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentPage = 'dashboar
       addAnnouncement({
           id: generateId('ann'), title: annTitle, content: annContent,
           date: new Date().toISOString().split('T')[0], audience: annAudience,
-          author: authorName, ...(annSchool ? { schoolName: annSchool } : {})
+          author: authorName, ...(annSchool ? { schoolName: annSchool, schoolID: schools.find(s => s.name === annSchool)?.id } : {})
       });
       refreshData();
       setShowAnnModal(false);
@@ -639,7 +638,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentPage = 'dashboar
               removeUser(user.uid);
               if(user.role === UserRole.STUDENT) {
                  const freshStudents = getStoredStudents();
-                 const s = freshStudents.find(s => s.schoolID === user.schoolID);
+                 const s = freshStudents.find(s => s.loginId === user.loginId);
                  if (s) removeStudent(s.id);
               }
               refreshData();
@@ -655,7 +654,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentPage = 'dashboar
           onConfirm: () => {
               removeStudent(student.id);
               const freshUsers = getStoredUsers();
-              const u = freshUsers.find(user => user.schoolID === student.schoolID);
+              const u = freshUsers.find(user => user.loginId === student.loginId);
               if (u) removeUser(u.uid);
               refreshData();
           }
@@ -686,7 +685,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentPage = 'dashboar
              onConfirm: () => {
                  removeStudent(editingStudent.id);
                  const freshUsers = getStoredUsers();
-                 const u = freshUsers.find(u => u.schoolID === editingStudent.schoolID);
+                 const u = freshUsers.find(u => u.loginId === editingStudent.loginId);
                  if (u) removeUser(u.uid);
                  refreshData();
                  setShowAddModal(false);
@@ -701,7 +700,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentPage = 'dashboar
                   removeUser(editingUser.uid);
                   if(editingUser.role === UserRole.STUDENT) {
                       const freshStudents = getStoredStudents();
-                      const s = freshStudents.find(s => s.schoolID === editingUser.schoolID);
+                      const s = freshStudents.find(s => s.loginId === editingUser.loginId);
                       if (s) removeStudent(s.id);
                   }
                   refreshData();
@@ -906,7 +905,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentPage = 'dashboar
                     <tr key={p.uid || Math.random().toString()} className="hover:bg-slate-50 dark:hover:bg-slate-800/50">
                     <td className="px-6 py-4 flex gap-3 text-slate-900 dark:text-white"><img src={p.avatarUrl} className="w-8 h-8 rounded-full" /> {p.name}</td>
                     <td className="px-6 py-4 text-blue-700 dark:text-blue-400 font-semibold">{p.schoolName || 'Unassigned'}</td>
-                    <td className="px-6 py-4 text-slate-600 dark:text-slate-300">{p.schoolID}</td>
+                    <td className="px-6 py-4 text-slate-600 dark:text-slate-300">{p.loginId}</td>
                     <td className="px-6 py-4 text-slate-400 dark:text-slate-500">{p.password}</td>
                     <td className="px-6 py-4 text-right">
                         <button onClick={() => openPrincipalModal(p)} className="text-blue-500 mr-3 hover:bg-blue-50 dark:hover:bg-blue-900/30 p-2 rounded"><Pencil size={18} /></button>
@@ -935,7 +934,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentPage = 'dashboar
                     <tr key={t.uid || Math.random().toString()} className="hover:bg-slate-50 dark:hover:bg-slate-800/50">
                     <td className="px-6 py-4 flex gap-3 text-slate-900 dark:text-white"><img src={t.avatarUrl} className="w-8 h-8 rounded-full" /> {t.name}</td>
                     <td className="px-6 py-4 text-blue-700 dark:text-blue-400 font-semibold">{t.schoolName || 'Unassigned'}</td>
-                    <td className="px-6 py-4 text-slate-600 dark:text-slate-300">{t.schoolID}</td>
+                    <td className="px-6 py-4 text-slate-600 dark:text-slate-300">{t.loginId}</td>
                     <td className="px-6 py-4 text-slate-600 dark:text-slate-300">{t.assignedSubject}</td>
                     <td className="px-6 py-4 text-right">
                         <button onClick={() => openTeacherModal(t)} className="text-blue-500 mr-3 hover:bg-blue-50 dark:hover:bg-blue-900/30 p-2 rounded"><Pencil size={18} /></button>
@@ -981,7 +980,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentPage = 'dashboar
                                 <td className="px-6 py-4 font-medium text-slate-900 dark:text-white">{s.name}</td>
                                 <td className="px-6 py-4 text-blue-700 dark:text-blue-400">{s.schoolName || 'Unassigned'}</td>
                                 <td className="px-6 py-4 text-slate-700 dark:text-slate-300">{s.className}</td>
-                                <td className="px-6 py-4 text-slate-500 dark:text-slate-400">{s.schoolID}</td>
+                                <td className="px-6 py-4 text-slate-500 dark:text-slate-400">{s.loginId}</td>
                                 <td className="px-6 py-4 text-center">
                                 <div className="flex justify-center gap-2">
                                     <button onClick={() => openMarksModal(s)} className="p-2 bg-slate-50 dark:bg-slate-800 hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-600 dark:text-slate-300 rounded border border-slate-200 dark:border-slate-700" title="Edit Marks">

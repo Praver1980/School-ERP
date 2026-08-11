@@ -10,7 +10,7 @@ interface LoginProps {
 }
 
 const Login: React.FC<LoginProps> = ({ onLoginSuccess, onShowPreview }) => {
-  const [schoolID, setSchoolID] = useState('');
+  const [loginId, setSchoolID] = useState('');
   const [password, setPassword] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');
@@ -21,7 +21,7 @@ const Login: React.FC<LoginProps> = ({ onLoginSuccess, onShowPreview }) => {
     setError('');
 
     try {
-      const user = await loginWithSchoolID(schoolID, password);
+      const user = await loginWithSchoolID(loginId, password);
       onLoginSuccess(user);
     } catch (err: any) {
       setError(err.message || 'Login failed');
@@ -96,7 +96,7 @@ const Login: React.FC<LoginProps> = ({ onLoginSuccess, onShowPreview }) => {
               <label className="text-label ml-1">School ID</label>
               <input
                 type="text"
-                value={schoolID}
+                value={loginId}
                 onChange={(e) => setSchoolID(e.target.value)}
                 className="w-full min-h-[48px] text-base"
                 placeholder="e.g., TCH-550"

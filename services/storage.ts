@@ -1,7 +1,62 @@
 import { User, UserRole, StudentRecord, Announcement, ERPDatabase, School, SchoolConfig, Assignment, Message } from '../types';
 import { SCHOOL_NAMES } from '../constants';
-import { collection, collectionGroup, doc, setDoc, deleteDoc, getDocs, onSnapshot, query, where } from 'firebase/firestore';
-import { db } from './firebase';
+
+
+
+import { supabase } from './supabase';
+
+const db = {};
+const doc = (...args: any[]) => args;
+const collection = (...args: any[]) => args;
+const collectionGroup = (...args: any[]) => args;
+const query = (...args: any[]) => args;
+const where = (...args: any[]) => args;
+
+const setDoc = async (pathArgs: any[], data: any) => {
+  try {
+    let table = pathArgs[1];
+    if (pathArgs[1] === 'schools' && pathArgs.length >= 4) {
+      table = pathArgs[3]; 
+    }
+    if (table === 'principals' || table === 'teachers' || table === 'admins') {
+      table = 'users';
+    }
+    await supabase.from(table).upsert(data);
+  } catch(e) { console.error(e); }
+};
+
+const deleteDoc = async (pathArgs: any[]) => {
+  try {
+    let table = pathArgs[1];
+    let id = pathArgs[pathArgs.length - 1];
+    if (pathArgs[1] === 'schools' && pathArgs.length >= 4) {
+      table = pathArgs[3];
+    }
+    if (table === 'principals' || table === 'teachers' || table === 'admins') {
+      table = 'users';
+    }
+    await supabase.from(table).delete().eq('id', id).eq('uid', id);
+  } catch(e) { console.error(e); }
+};
+
+const onSnapshot = (queryArgs: any, callback: (snap: any) => void, errorCallback?: (error: any) => void) => {
+  return () => {};
+};
+
+// --- END SHIM ---
+
+
+
+
+// --- END SHIM ---
+
+
+
+
+// --- END SHIM ---
+
+
+
 
 const generateSyntheticEmailForStorage = (id: string): string => {
   const sanitizedID = id.trim().toUpperCase().replace(/[^A-Z0-9-]/g, '');
@@ -18,6 +73,7 @@ const STORAGE_KEY_STUDENTS = 'nexus_erp_students_v2';
 const STORAGE_KEY_ANNOUNCEMENTS = 'nexus_erp_announcements_v1';
 const STORAGE_KEY_SCHOOLS = 'nexus_erp_schools_v2'; 
 const STORAGE_KEY_ASSIGNMENTS = 'nexus_erp_assignments_v1';
+const STORAGE_KEY_SUBMISSIONS = 'nexus_erp_submissions_v1';
 const STORAGE_KEY_MESSAGES = 'nexus_erp_messages_v1';
 const STORAGE_KEY_PAYMENTS = 'nexus_erp_payments_v1';
 
@@ -40,7 +96,7 @@ const getRoleCollection = (role: UserRole) => {
 const INITIAL_USERS: User[] = [
   {
     uid: 'u_admin',
-    schoolID: 'admin9945',
+    loginId: 'admin9945',
     name: 'System Administrator',
     role: UserRole.SUPREME_ADMIN,
     avatarUrl: 'https://ui-avatars.com/api/?name=System+Admin&background=10b981&color=fff',
@@ -48,93 +104,81 @@ const INITIAL_USERS: User[] = [
   }
 ];
 
-export const initializeFirebaseSync = async (user: User | null = null) => {
+export const initializeSupabaseSync = async (user: User | null = null) => {
   if (!user) return; // Only sync if logged in
 
   const isSupremeAdmin = user.role === UserRole.SUPREME_ADMIN;
   
-  // Use queries based on role
-  const createQuery = (colName: string) => {
-    return isSupremeAdmin ? collection(db, colName) : query(collection(db, colName), where('schoolName', '==', user.schoolName || user.schoolID));
-  };
-  
-  // Specifically for schools
-  const schoolsQuery = isSupremeAdmin ? collection(db, 'schools') : query(collection(db, 'schools'), where('name', '==', user.schoolName));
-
-  const collections = [
-    { name: 'announcements', key: STORAGE_KEY_ANNOUNCEMENTS, query: createQuery('announcements') },
-    { name: 'schools', key: STORAGE_KEY_SCHOOLS, query: schoolsQuery },
-    { name: 'assignments', key: STORAGE_KEY_ASSIGNMENTS, query: createQuery('assignments') },
-    { name: 'messages', key: STORAGE_KEY_MESSAGES, query: collection(db, 'messages') }, // Messages handled separately or globally depending on rules
-    { name: 'payments', key: STORAGE_KEY_PAYMENTS, query: createQuery('payments') }
-  ];
-
-  const syncPromises = collections.map(col => {
-    return new Promise<void>((resolve) => {
-      onSnapshot(col.query, async (snap) => {
-        if (!snap.empty) {
-          const data = snap.docs.map(d => d.data());
-          localStorage.setItem(col.key, JSON.stringify(data));
-          window.dispatchEvent(new Event('nexus_data_changed'));
-          resolve(); 
-        } else {
-          resolve();
-        }
-      }, (error) => {
-        console.error(`Error syncing collection ${col.name}:`, error);
-        resolve();
-      });
-    });
-  });
-
-  // Sync users and students from tree structure
-  const userRoles = ['principals', 'teachers', 'admins', 'users'];
-  let allUsers: any[] = [];
-  let allStudents: any[] = [];
-
-  const handleUsersUpdate = () => {
-    if (allUsers.length > 0) {
-      localStorage.setItem(STORAGE_KEY_USERS, JSON.stringify(allUsers));
-      window.dispatchEvent(new Event('nexus_data_changed'));
+  // Helper to fetch data
+  const fetchTable = async (table: string, useSchoolFilter: boolean = true) => {
+    let query = supabase.from(table).select('*');
+    if (!isSupremeAdmin && useSchoolFilter && user.schoolID) {
+      query = query.eq('schoolID', user.schoolID);
+    } else if (!isSupremeAdmin && useSchoolFilter && user.schoolName && table === 'schools') {
+      query = query.eq('name', user.schoolName);
     }
+    const { data, error } = await query;
+    if (error) console.error("Error fetching", table, error);
+    return data || [];
   };
 
-  const rolePromises = userRoles.map(role => {
-    return new Promise<void>((resolve) => {
-      const q = isSupremeAdmin ? collectionGroup(db, role) : collection(db, 'schools', user.schoolID, role);
-      onSnapshot(q, (snap) => {
-        const newData = snap.docs.map(d => d.data());
-        allUsers = allUsers.filter(u => u.role !== role.replace('principals', 'principal').replace('teachers', 'teacher').replace('admins', 'supreme_admin').replace('users', 'student'));
-        allUsers = [...allUsers, ...newData];
-        
-        const uniqueUsers = Array.from(new Map(allUsers.map(item => [item.uid, item])).values());
-        allUsers = uniqueUsers;
-        
-        handleUsersUpdate();
-        resolve();
-      }, (error) => {
-        console.error(`Error syncing role ${role}:`, error);
-        resolve();
-      });
-    });
-  });
+  try {
+    const [
+      announcements,
+      schools,
+      assignments,
+      submissions,
+      payments,
+      students,
+      usersList
+    ] = await Promise.all([
+      fetchTable('announcements'),
+      fetchTable('schools', true),
+      fetchTable('assignments'),
+      fetchTable('assignment_submissions'),
+      fetchTable('payments'),
+      fetchTable('students'),
+      fetchTable('users')
+    ]);
 
-  const studentPromise = new Promise<void>((resolve) => {
-    const q = isSupremeAdmin ? collectionGroup(db, 'students') : collection(db, 'schools', user.schoolID, 'students');
-    onSnapshot(q, (snap) => {
-      allStudents = snap.docs.map(d => d.data());
-      if (allStudents.length > 0) {
-        localStorage.setItem(STORAGE_KEY_STUDENTS, JSON.stringify(allStudents));
-        window.dispatchEvent(new Event('nexus_data_changed'));
-      }
-      resolve();
-    }, (error) => {
-      console.error('Error syncing students:', error);
-      resolve();
-    });
-  });
+    localStorage.setItem(STORAGE_KEY_ANNOUNCEMENTS, JSON.stringify(announcements));
+    localStorage.setItem(STORAGE_KEY_SCHOOLS, JSON.stringify(schools));
+    localStorage.setItem(STORAGE_KEY_ASSIGNMENTS, JSON.stringify(assignments));
+    localStorage.setItem(STORAGE_KEY_SUBMISSIONS, JSON.stringify(submissions));
+    localStorage.setItem(STORAGE_KEY_PAYMENTS, JSON.stringify(payments));
+    localStorage.setItem(STORAGE_KEY_STUDENTS, JSON.stringify(students));
+    localStorage.setItem(STORAGE_KEY_USERS, JSON.stringify(usersList));
+    
+    // Fetch messages (RLS ensures user only sees their own)
+    const { data: messages } = await supabase.from('messages').select('*');
+    if (messages) localStorage.setItem(STORAGE_KEY_MESSAGES, JSON.stringify(messages));
 
-  await Promise.all([...syncPromises, ...rolePromises, studentPromise]);
+    window.dispatchEvent(new Event('nexus_data_changed'));
+  } catch (error) {
+    console.error("Initial sync error:", error);
+  }
+
+  // Setup Realtime for critical updates (Messages & Announcements)
+  const channel = supabase.channel('schema-db-changes')
+    .on('postgres_changes', { event: '*', schema: 'public', table: 'messages' }, (payload) => {
+        supabase.from('messages').select('*').then(({data}) => {
+            if(data) {
+                localStorage.setItem(STORAGE_KEY_MESSAGES, JSON.stringify(data));
+                window.dispatchEvent(new Event('nexus_data_changed'));
+            }
+        });
+    })
+    .on('postgres_changes', { event: '*', schema: 'public', table: 'announcements' }, (payload) => {
+        fetchTable('announcements').then((data) => {
+            localStorage.setItem(STORAGE_KEY_ANNOUNCEMENTS, JSON.stringify(data));
+            window.dispatchEvent(new Event('nexus_data_changed'));
+        });
+    })
+    .subscribe();
+
+  return () => {
+    supabase.removeChannel(channel);
+  };
 };
 
 
@@ -189,7 +233,7 @@ export const addUser = (user: User): void => {
   users.push(user);
   localStorage.setItem(STORAGE_KEY_USERS, JSON.stringify(users));
   const recId = getRecognizableId(user.name, user.uid);
-  setDoc(doc(db, 'schools', user.schoolID || 'global', getRoleCollection(user.role), recId), user).catch(console.error);
+  setDoc(doc(db, 'schools', user.loginId || 'global', getRoleCollection(user.role), recId), user).catch(console.error);
   setDoc(doc(db, 'users', user.uid), user).catch(console.error);
 };
 
@@ -200,7 +244,7 @@ export const updateUser = (updatedUser: User): void => {
     users[index] = updatedUser;
     localStorage.setItem(STORAGE_KEY_USERS, JSON.stringify(users));
     const recId = getRecognizableId(updatedUser.name, updatedUser.uid);
-    setDoc(doc(db, 'schools', updatedUser.schoolID || 'global', getRoleCollection(updatedUser.role), recId), updatedUser).catch(console.error);
+    setDoc(doc(db, 'schools', updatedUser.loginId || 'global', getRoleCollection(updatedUser.role), recId), updatedUser).catch(console.error);
     setDoc(doc(db, 'users', updatedUser.uid), updatedUser).catch(console.error);
   }
 };
@@ -213,7 +257,7 @@ export const removeUser = (uid: string): void => {
   
   if (userToDelete) {
     const recId = getRecognizableId(userToDelete.name, userToDelete.uid);
-    deleteDoc(doc(db, 'schools', userToDelete.schoolID || 'global', getRoleCollection(userToDelete.role), recId)).catch(console.error);
+    deleteDoc(doc(db, 'schools', userToDelete.loginId || 'global', getRoleCollection(userToDelete.role), recId)).catch(console.error);
     deleteDoc(doc(db, 'users', uid)).catch(console.error);
     deleteAuthUser(uid);
     
@@ -243,7 +287,7 @@ export const addStudent = (student: StudentRecord): void => {
   localStorage.setItem(STORAGE_KEY_STUDENTS, JSON.stringify(students));
   const recId = getRecognizableId(student.name, student.id);
   
-  setDoc(doc(db, 'schools', student.schoolID || 'global', 'students', recId), student).catch(console.error);
+  setDoc(doc(db, 'schools', student.loginId || 'global', 'students', recId), student).catch(console.error);
   
   // Auto-calculate roll numbers for the class
   recalculateRollNumbers(student.className);
@@ -259,7 +303,7 @@ export const updateStudent = (updatedStudent: StudentRecord): void => {
     localStorage.setItem(STORAGE_KEY_STUDENTS, JSON.stringify(students));
     const recId = getRecognizableId(updatedStudent.name, updatedStudent.id);
     
-    setDoc(doc(db, 'schools', updatedStudent.schoolID || 'global', 'students', recId), updatedStudent).catch(console.error);
+    setDoc(doc(db, 'schools', updatedStudent.loginId || 'global', 'students', recId), updatedStudent).catch(console.error);
     
     // Recalculate for new class
     recalculateRollNumbers(updatedStudent.className);
@@ -281,7 +325,7 @@ export const removeStudent = (studentId: string): void => {
         localStorage.setItem(STORAGE_KEY_STUDENTS, JSON.stringify(newList));
         const recId = getRecognizableId(student.name, student.id);
         
-        deleteDoc(doc(db, 'schools', student.schoolID || 'global', 'students', recId)).catch(console.error);
+        deleteDoc(doc(db, 'schools', student.loginId || 'global', 'students', recId)).catch(console.error);
         deleteDoc(doc(db, 'users', studentId)).catch(console.error);
         
         deleteAuthUser(studentId);
@@ -296,7 +340,7 @@ export const saveAllStudents = (students: StudentRecord[]): void => {
   localStorage.setItem(STORAGE_KEY_STUDENTS, JSON.stringify(students));
   students.forEach(s => {
     const recId = getRecognizableId(s.name, s.id);
-    setDoc(doc(db, 'schools', s.schoolID || 'global', 'students', recId), s).catch(console.error);
+    setDoc(doc(db, 'schools', s.loginId || 'global', 'students', recId), s).catch(console.error);
   });
 };
 
@@ -326,39 +370,60 @@ export const deleteAnnouncement = (id: string): void => {
 // --- ASSIGNMENTS MANAGEMENT ---
 export const getStoredAssignments = (): Assignment[] => {
   const stored = localStorage.getItem(STORAGE_KEY_ASSIGNMENTS);
-  return stored ? JSON.parse(stored) : [];
+  const assignments = stored ? JSON.parse(stored) : [];
+  const storedSubs = localStorage.getItem(STORAGE_KEY_SUBMISSIONS);
+  const submissions = storedSubs ? JSON.parse(storedSubs) : [];
+  return assignments.map((a: any) => ({ ...a, submissions: submissions.filter((s: any) => s.assignmentId === a.id) }));
 };
 
 export const addAssignment = (assignment: Assignment): void => {
-  const items = getStoredAssignments();
-  items.unshift(assignment);
+  let items = getStoredAssignments().map((a: any) => {
+      const { submissions, ...rest } = a;
+      return rest;
+  });
+  
+  const { submissions, ...assignmentToSave } = assignment as any;
+  items.unshift(assignmentToSave);
   localStorage.setItem(STORAGE_KEY_ASSIGNMENTS, JSON.stringify(items));
-  setDoc(doc(db, 'assignments', assignment.id), assignment).catch(console.error);
+  setDoc(doc(db, 'assignments', assignment.id), assignmentToSave).catch(console.error);
 };
 
 export const updateAssignment = (updatedAssignment: Assignment): void => {
-  const items = getStoredAssignments();
+  let items = getStoredAssignments().map((a: any) => {
+      const { submissions, ...rest } = a;
+      return rest;
+  });
+  
   const index = items.findIndex(a => a.id === updatedAssignment.id);
   if (index !== -1) {
-    items[index] = updatedAssignment;
+    const { submissions, ...assignmentToSave } = updatedAssignment as any;
+    items[index] = assignmentToSave;
     localStorage.setItem(STORAGE_KEY_ASSIGNMENTS, JSON.stringify(items));
-    setDoc(doc(db, 'assignments', updatedAssignment.id), updatedAssignment).catch(console.error);
+    setDoc(doc(db, 'assignments', updatedAssignment.id), assignmentToSave).catch(console.error);
   }
 };
 
 export const submitAssignment = (assignmentId: string, submission: import('../types').AssignmentSubmission): void => {
-  const items = getStoredAssignments();
-  const index = items.findIndex(a => a.id === assignmentId);
-  if (index !== -1) {
-    if (!items[index].submissions) {
-      items[index].submissions = [];
-    }
-    // Remove previous submission by this student if any
-    items[index].submissions = items[index].submissions!.filter(s => s.studentId !== submission.studentId);
-    items[index].submissions!.push(submission);
-    localStorage.setItem(STORAGE_KEY_ASSIGNMENTS, JSON.stringify(items));
-    setDoc(doc(db, 'assignments', assignmentId), items[index]).catch(console.error);
+  const storedSubs = localStorage.getItem(STORAGE_KEY_SUBMISSIONS);
+  let submissions = storedSubs ? JSON.parse(storedSubs) : [];
+  
+  // Create unique ID for submission if none exists
+  submission.id = submission.id || 'sub_' + Math.random().toString(36).substr(2, 9);
+  submission.assignmentId = assignmentId;
+  
+  // Find assignment to get loginId
+  const assignments = getStoredAssignments();
+  const assignment = assignments.find(a => a.id === assignmentId);
+  if (assignment && assignment.schoolID) {
+      submission.schoolID = assignment.schoolID;
   }
+  
+  // Remove previous submission
+  submissions = submissions.filter((s: any) => !(s.assignmentId === assignmentId && s.studentId === submission.studentId));
+  submissions.push(submission);
+  
+  localStorage.setItem(STORAGE_KEY_SUBMISSIONS, JSON.stringify(submissions));
+  setDoc(doc(db, 'assignment_submissions', submission.id!), submission).catch(console.error);
 };
 
 export const updateSubmissionStatus = (
@@ -367,16 +432,15 @@ export const updateSubmissionStatus = (
   teacherVerified: 'pending' | 'verified' | 'rejected', 
   completionStatus: 'pending' | 'complete' | 'incomplete'
 ): void => {
-  const items = getStoredAssignments();
-  const index = items.findIndex(a => a.id === assignmentId);
-  if (index !== -1 && items[index].submissions) {
-    const subIndex = items[index].submissions!.findIndex(s => s.studentId === studentId);
-    if (subIndex !== -1) {
-      items[index].submissions![subIndex].teacherVerified = teacherVerified;
-      items[index].submissions![subIndex].completionStatus = completionStatus;
-      localStorage.setItem(STORAGE_KEY_ASSIGNMENTS, JSON.stringify(items));
-      setDoc(doc(db, 'assignments', assignmentId), items[index]).catch(console.error);
-    }
+  const storedSubs = localStorage.getItem(STORAGE_KEY_SUBMISSIONS);
+  let submissions = storedSubs ? JSON.parse(storedSubs) : [];
+  
+  const subIndex = submissions.findIndex((s: any) => s.assignmentId === assignmentId && s.studentId === studentId);
+  if (subIndex !== -1) {
+    submissions[subIndex].teacherVerified = teacherVerified;
+    submissions[subIndex].completionStatus = completionStatus;
+    localStorage.setItem(STORAGE_KEY_SUBMISSIONS, JSON.stringify(submissions));
+    setDoc(doc(db, 'assignment_submissions', submissions[subIndex].id), submissions[subIndex]).catch(console.error);
   }
 };
 
@@ -437,10 +501,10 @@ export const removeSchool = (id: string): void => {
     localStorage.setItem(STORAGE_KEY_SCHOOLS, JSON.stringify(schools));
     deleteDoc(doc(db, 'schools', id)).catch(console.error);
     
-    const users = getStoredUsers().filter(u => u.schoolID === id);
+    const users = getStoredUsers().filter(u => u.loginId === id);
     users.forEach(u => removeUser(u.uid));
     
-    const students = getStoredStudents().filter(s => s.schoolID === id);
+    const students = getStoredStudents().filter(s => s.loginId === id);
     students.forEach(s => removeStudent(s.id));
     
     const announcements = getStoredAnnouncements().filter(a => a.schoolName === school?.name);
@@ -450,7 +514,7 @@ export const removeSchool = (id: string): void => {
     assignments.forEach(a => deleteAssignment(a.id));
     
     const payments = getStoredPayments().filter(p => {
-        // payments don't have schoolID directly, but we can match by principal's schoolID if needed
+        // payments don't have loginId directly, but we can match by principal's loginId if needed
         // Actually, we are deleting the users (principals) anyway. But to be thorough:
         
         return p.schoolName === school?.name;

@@ -27,7 +27,7 @@ export interface TeachingAssignment {
 
 export interface User {
   uid: string;
-  schoolID: string;
+  loginId: string;
   name: string;
   role: UserRole;
   email?: string; 
@@ -42,7 +42,8 @@ export interface User {
   dob?: string;
   designation?: string; 
   house?: HouseTeam;
-  schoolName?: string; // New: Assigned School
+  schoolName?: string;
+  schoolID?: string;
 }
 
 export interface MarkEntry {
@@ -54,7 +55,7 @@ export interface MarkEntry {
 export interface StudentRecord {
   id: string;
   name: string;
-  schoolID: string;
+  loginId: string;
   rollNumber: number;
   attendanceToday: boolean | null; 
   attendanceHistory?: { [date: string]: boolean }; // New: 'YYYY-MM-DD': true (Present) | false (Absent)
@@ -69,7 +70,8 @@ export interface StudentRecord {
   marks?: MarkEntry[];
   house?: HouseTeam; 
   studentPost?: string;
-  schoolName?: string; // New: Assigned School
+  schoolName?: string;
+  schoolID?: string;
 }
 
 export interface Announcement {
@@ -79,10 +81,14 @@ export interface Announcement {
   date: string;
   audience: 'all' | 'student' | 'teacher';
   author: string;
-  schoolName?: string; // New: If undefined/null, it is visible to ALL schools (Global)
+  schoolName?: string;
+  schoolID?: string;
 }
 
 export interface AssignmentSubmission {
+  id?: string;
+  assignmentId?: string;
+  schoolID?: string;
   studentId: string;
   studentName: string;
   submittedAt: string;
@@ -101,6 +107,7 @@ export interface Assignment {
   dueDate: string;
   targetClass: string; // e.g., "10th-A"
   schoolName: string;
+  schoolID?: string;
   authorName: string;
   teacherUid: string;
   createdAt: string;
@@ -127,6 +134,7 @@ export interface Message {
 export interface PaymentRecord {
   id: string;
   schoolName: string;
+  schoolID?: string;
   principalUid: string;
   principalName: string;
   amount: number; // calculated at Rs 2 per student

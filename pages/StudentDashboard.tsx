@@ -170,7 +170,7 @@ const StudentDashboard: React.FC<StudentDashboardProps> = ({ user, currentPage =
   };
 
   const getStudentProfile = (): StudentRecord | undefined => {
-    return getStoredStudents().find(s => s.schoolID === user.schoolID);
+    return getStoredStudents().find(s => s.loginId === user.loginId);
   };
 
   const handleOfflineSubmit = (assignmentId: string) => {
@@ -1130,7 +1130,7 @@ const StudentDashboard: React.FC<StudentDashboardProps> = ({ user, currentPage =
             <h1 className="text-3xl md:text-4xl font-black mb-2 tracking-tight">Hello, {user.name}</h1>
             <div className="flex flex-wrap items-center justify-center md:justify-start gap-3 text-blue-100 font-mono text-sm">
               <span className="bg-black/20 px-3 py-1 rounded-lg backdrop-blur-sm border border-white/10 flex items-center gap-2">
-                <Hash size={14} /> {user.schoolID}
+                <Hash size={14} /> {user.loginId}
               </span>
               <span className="bg-black/20 px-3 py-1 rounded-lg backdrop-blur-sm border border-white/10 flex items-center gap-2">
                 <Book size={14} /> Class {user.className || 'N/A'}

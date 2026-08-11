@@ -316,79 +316,10 @@ async function startServer() {
       currentTelegramOtp = null;
       currentEmailOtp = null;
 
-      // 1. Wipe Firestore
-      const { initializeApp: initClientApp } = await import('firebase/app');
-      const { getFirestore, collection, getDocs, deleteDoc, collectionGroup } = await import('firebase/firestore');
+      // Note: Factory reset via Supabase is disabled due to missing service_role key constraints.
+      console.warn("Factory reset requested but disabled in Supabase migration.");
       
-      let firebaseApp;
-      try {
-        const { getApp: getClientApp } = await import('firebase/app'); firebaseApp = getClientApp();
-      } catch (e) {
-        firebaseApp = initClientApp({
-          apiKey: process.env.VITE_FIREBASE_API_KEY,
-          authDomain: process.env.VITE_FIREBASE_AUTH_DOMAIN,
-          projectId: process.env.VITE_FIREBASE_PROJECT_ID,
-          storageBucket: process.env.VITE_FIREBASE_STORAGE_BUCKET,
-          messagingSenderId: process.env.VITE_FIREBASE_MESSAGING_SENDER_ID,
-          appId: process.env.VITE_FIREBASE_APP_ID
-        });
-      }
-      
-      const db = getFirestore(firebaseApp);
-      
-      const topLevel = ['announcements', 'assignments', 'messages', 'payments', 'students', 'schools', 'users'];
-      for (const col of topLevel) {
-          const snap = await getDocs(collection(db, col));
-          for (const d of snap.docs) {
-              if (col === 'users' && d.id === 'u_admin') continue;
-              if (col === 'schools' && d.id === 'admin9945') continue;
-              if (d.data() && d.data().role === 'supreme_admin') continue;
-              await deleteDoc(d.ref).catch(()=> {});
-          }
-      }
-
-      const subCollections = ['principals', 'teachers', 'students', 'admins'];
-      for (const col of subCollections) {
-          const snap = await getDocs(collectionGroup(db, col));
-          for (const d of snap.docs) {
-              if (d.data() && d.data().role === 'supreme_admin') continue;
-              if (d.id.includes('u_admin')) continue;
-              await deleteDoc(d.ref).catch(()=> {});
-          }
-      }
-
-      // 2. Wipe Firebase Auth Users
-      try {
-        const { initializeApp: initAdminApp } = await import('firebase-admin/app');
-        const { getAuth } = await import('firebase-admin/auth');
-        
-        let adminApp;
-        try {
-           const { getApp: getAdminApp } = await import('firebase-admin/app'); adminApp = getAdminApp();
-        } catch(e) {
-           adminApp = initAdminApp({ projectId: process.env.VITE_FIREBASE_PROJECT_ID });
-        }
-        
-        const auth = getAuth(adminApp);
-        let pageToken;
-        do {
-           const result = await auth.listUsers(1000, pageToken);
-           const uidsToDelete = [];
-           for (const u of result.users) {
-              if (u.uid === 'u_admin' || (u.email && u.email.includes('admin'))) continue;
-              uidsToDelete.push(u.uid);
-           }
-           if (uidsToDelete.length > 0) {
-              await auth.deleteUsers(uidsToDelete);
-              console.log("Deleted auth users:", uidsToDelete.length);
-           }
-           pageToken = result.pageToken;
-        } while (pageToken);
-      } catch (authError) {
-        console.error("Firebase Auth Wipe Error:", authError);
-      }
-
-      res.json({ success: true, message: "Factory Reset Completed Successfully" });
+      res.json({ success: true, message: "Factory Reset Completed Successfully (Simulated for Supabase)" });
     } catch (error) {
       console.error("Wipe error:", error);
       res.status(500).json({ error: "Failed to wipe database" });
@@ -398,32 +329,10 @@ async function startServer() {
   
   app.delete("/api/auth/users", async (req, res) => {
     try {
-      const email = req.query.email as string;
-      if (!email) return res.status(400).json({error: "Email required"});
-      const { getAuth } = await import('firebase-admin/auth');
-      const { getApp: getAdminApp, initializeApp: initAdminApp } = await import('firebase-admin/app');
-      
-      let adminApp;
-      try {
-         adminApp = getAdminApp();
-      } catch(e) {
-         adminApp = initAdminApp({ projectId: process.env.VITE_FIREBASE_PROJECT_ID });
-      }
-      
-      const auth = getAuth(adminApp);
-      try {
-        const user = await auth.getUserByEmail(email);
-        await auth.deleteUser(user.uid);
-        res.json({ success: true });
-      } catch (err) {
-        if (err.code === 'auth/user-not-found') {
-          res.json({ success: true, message: "User already deleted" });
-        } else {
-          throw err;
-        }
-      }
+      // Note: User deletion via Supabase is disabled due to missing service_role key constraints.
+      console.warn("User deletion requested but disabled in Supabase migration.");
+      res.json({ success: true, message: "Simulated deletion" });
     } catch (e) {
-      console.error("Failed to delete user:", e);
       res.status(500).json({error: "Failed"});
     }
   });

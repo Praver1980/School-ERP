@@ -51,7 +51,7 @@ const TeacherDashboard: React.FC<Props> = ({ currentPage = 'dashboard', currentU
   const [age, setAge] = useState('');
   const [dob, setDob] = useState('');
   const [gender, setGender] = useState('Male'); 
-  const [schoolID, setSchoolID] = useState('');
+  const [loginId, setSchoolID] = useState('');
   const [password, setPassword] = useState(''); 
   
   // Split Class State
@@ -189,7 +189,7 @@ const TeacherDashboard: React.FC<Props> = ({ currentPage = 'dashboard', currentU
       e.preventDefault();
       if (!messageTargetStudent || !messageContent.trim()) return;
 
-      const targetUser = users.find(u => u.schoolID === messageTargetStudent.schoolID);
+      const targetUser = users.find(u => u.loginId === messageTargetStudent.loginId);
       if (!targetUser) {
           setAlertState({ isOpen: true, title: 'Error', message: 'Could not find user account for this student.' });
           return;
@@ -240,8 +240,8 @@ const TeacherDashboard: React.FC<Props> = ({ currentPage = 'dashboard', currentU
       if ((!newMessageContent.trim() && !attachment) || !newMessageRecipientId) return;
 
       const allUsers = getStoredUsers();
-      const studentRecord = getStoredStudents().find(s => s.schoolID === newMessageRecipientId);
-      const recipientUser = allUsers.find(u => u.schoolID === newMessageRecipientId && u.role === UserRole.STUDENT);
+      const studentRecord = getStoredStudents().find(s => s.loginId === newMessageRecipientId);
+      const recipientUser = allUsers.find(u => u.loginId === newMessageRecipientId && u.role === UserRole.STUDENT);
       
       const rId = recipientUser ? recipientUser.uid : (studentRecord ? studentRecord.id : newMessageRecipientId);
       const rName = recipientUser ? recipientUser.name : (studentRecord ? studentRecord.name : 'Student');
@@ -453,13 +453,13 @@ const TeacherDashboard: React.FC<Props> = ({ currentPage = 'dashboard', currentU
 
     setEditingId(student.id);
     setFormError('');
-    const userLogin = users.find(u => u.schoolID === student.schoolID);
+    const userLogin = users.find(u => u.loginId === student.loginId);
     
     setName(student.name);
     setAge(student.age?.toString() || '');
     setDob(student.dob || '');
     setGender(student.gender || 'Male');
-    setSchoolID(student.schoolID);
+    setSchoolID(student.loginId);
     setPassword(userLogin?.password || '');
     
     const { pGrade, pSection } = parseClassString(student.className);
@@ -504,11 +504,11 @@ const TeacherDashboard: React.FC<Props> = ({ currentPage = 'dashboard', currentU
     const isDuplicate = users.some(u => {
         if (editingId) {
              const originalStudent = students.find(s => s.id === editingId);
-             if (originalStudent && u.schoolID === originalStudent.schoolID) {
+             if (originalStudent && u.loginId === originalStudent.loginId) {
                  return false; 
              }
         }
-        return u.schoolID === schoolID;
+        return u.loginId === loginId;
     });
 
     if (isDuplicate) {
@@ -526,17 +526,17 @@ const TeacherDashboard: React.FC<Props> = ({ currentPage = 'dashboard', currentU
 
       const updatedRecord: StudentRecord = {
         ...existingStudent,
-        name, schoolID, className: fullClass, age: parseInt(age), dob, gender,
+        name, loginId, className: fullClass, age: parseInt(age), dob, gender,
         email, fatherContact, motherContact, house, studentPost,
-        schoolName: currentUser.schoolName
+        schoolName: currentUser.schoolName, schoolID: currentUser.schoolID
       };
       
       updateStudent(updatedRecord);
 
-      const associatedUser = users.find(u => u.schoolID === existingStudent.schoolID);
+      const associatedUser = users.find(u => u.loginId === existingStudent.loginId);
       if (associatedUser) {
         const updatedUser: User = {
-          ...associatedUser, name, schoolID, password, className: fullClass, gender, dob, email: email, schoolName: currentUser.schoolName
+          ...associatedUser, name, loginId, password, className: fullClass, gender, dob, email: email, schoolName: currentUser.schoolName, schoolID: currentUser.schoolID
         };
         updateUser(updatedUser);
       }
@@ -545,21 +545,21 @@ const TeacherDashboard: React.FC<Props> = ({ currentPage = 'dashboard', currentU
 
     } else {
       const newRecord: StudentRecord = {
-        id: generateId('s'), name, schoolID, rollNumber: 0, attendanceToday: null, attendanceHistory: {}, gradeAverage: 0, className: fullClass,
+        id: generateId('s'), name, loginId, rollNumber: 0, attendanceToday: null, attendanceHistory: {}, gradeAverage: 0, className: fullClass,
         age: parseInt(age), dob, gender, email, fatherContact, motherContact, marks: [], house, studentPost,
-        schoolName: currentUser.schoolName
+        schoolName: currentUser.schoolName, schoolID: currentUser.schoolID
       };
 
       addStudent(newRecord);
 
       const newUser: User = {
-        uid: generateId('u'), name, schoolID, role: UserRole.STUDENT, className: fullClass, password, gender, dob,
+        uid: generateId('u'), name, loginId, role: UserRole.STUDENT, className: fullClass, password, gender, dob,
         avatarUrl: `https://ui-avatars.com/api/?name=${encodeURIComponent(name)}&background=f59e0b&color=fff`,
-        schoolName: currentUser.schoolName
+        schoolName: currentUser.schoolName, schoolID: currentUser.schoolID
       };
 
       addUser(newUser);
-      setAlertState({ isOpen: true, message: `Student Added! Login ID: ${schoolID}, Password: ${password}` });
+      setAlertState({ isOpen: true, message: `Student Added! Login ID: ${loginId}, Password: ${password}` });
     }
 
     refreshStudentList();
@@ -582,7 +582,7 @@ const TeacherDashboard: React.FC<Props> = ({ currentPage = 'dashboard', currentU
 
               // 2. Remove User Record
               const freshUsers = getStoredUsers();
-              const user = freshUsers.find(u => u.schoolID === schoolID); // schoolID is from state
+              const user = freshUsers.find(u => u.loginId === loginId); // loginId is from state
               if (user) {
                   removeUser(user.uid);
               }
@@ -693,7 +693,7 @@ const TeacherDashboard: React.FC<Props> = ({ currentPage = 'dashboard', currentU
           content: assignContent,
           dueDate: assignDueDate,
           targetClass: `${assignGrade}-${assignSection}`,
-          schoolName: currentUser.schoolName!,
+          schoolName: currentUser.schoolName, schoolID: currentUser.schoolID!,
           authorName: currentUser.name,
           teacherUid: currentUser.uid,
           createdAt: new Date().toISOString()
@@ -964,7 +964,7 @@ const TeacherDashboard: React.FC<Props> = ({ currentPage = 'dashboard', currentU
                                   >
                                       <option value="">-- Select a student --</option>
                                       {myStudents.map(student => (
-                                          <option key={student.id || Math.random().toString()} value={student.schoolID}>{student.name} ({student.className})</option>
+                                          <option key={student.id || Math.random().toString()} value={student.loginId}>{student.name} ({student.className})</option>
                                       ))}
                                   </select>
                               </div>
@@ -1564,7 +1564,7 @@ const TeacherDashboard: React.FC<Props> = ({ currentPage = 'dashboard', currentU
                           </div>
                           <div className="flex flex-col">
                             <span className="font-bold text-slate-900 dark:text-white text-sm group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors">{student.name}</span>
-                            <span className="text-[10px] text-slate-400 dark:text-slate-500 font-mono uppercase tracking-tighter">{student.schoolID}</span>
+                            <span className="text-[10px] text-slate-400 dark:text-slate-500 font-mono uppercase tracking-tighter">{student.loginId}</span>
                           </div>
                         </div>
                       </td>
@@ -1713,7 +1713,7 @@ const TeacherDashboard: React.FC<Props> = ({ currentPage = 'dashboard', currentU
                    <input className="w-full p-2 border dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white rounded" type="date" value={dob} onChange={handleDobChange} />
                    <input className="w-full p-2 border dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white rounded" placeholder="Age" value={age} readOnly />
                </div>
-               <div><label className="block text-sm font-medium mb-1 text-slate-700 dark:text-slate-300">School ID</label><input className="w-full p-2 border dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white rounded" value={schoolID} onChange={e => setSchoolID(e.target.value)} required /></div>
+               <div><label className="block text-sm font-medium mb-1 text-slate-700 dark:text-slate-300">School ID</label><input className="w-full p-2 border dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white rounded" value={loginId} onChange={e => setSchoolID(e.target.value)} required /></div>
                <div><label className="block text-sm font-medium mb-1 text-slate-700 dark:text-slate-300">Password</label><input className="w-full p-2 border dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white rounded" value={password} onChange={e => setPassword(e.target.value)} required /></div>
                
                <div className="flex gap-2 mt-4">

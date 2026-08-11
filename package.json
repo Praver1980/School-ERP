@@ -13,11 +13,10 @@
   "dependencies": {
     "@azure/msal-browser": "^5.1.0",
     "@microsoft/microsoft-graph-client": "^3.0.7",
+    "@supabase/supabase-js": "^2.112.3",
     "cors": "^2.8.6",
     "dotenv": "^17.4.2",
     "express": "^5.2.1",
-    "firebase": "^12.17.0",
-    "firebase-admin": "^14.2.0",
     "lucide-react": "^0.563.0",
     "nodemailer": "^9.0.4",
     "react": "^19.2.4",

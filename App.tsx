@@ -13,9 +13,8 @@ import { User, UserRole } from './types';
 import { logout } from './services/authService';
 import { Menu } from 'lucide-react';
 
-import { onAuthStateChanged } from 'firebase/auth';
-import { doc, getDoc } from 'firebase/firestore';
-import { auth, db } from './services/firebase';
+
+import { supabase } from './services/supabase';
 
 function App() {
   const [user, setUser] = useState<User | null>(null);
@@ -43,34 +42,32 @@ function App() {
   };
 
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
+      const user = session?.user;
       try {
-        if (firebaseUser) {
-          // User is signed in, fetch profile
-          const userDoc = await getDoc(doc(db, 'users', firebaseUser.uid));
-          if (userDoc.exists()) {
-            const userData = userDoc.data() as User;
-            setUser(userData);
-            const { initializeFirebaseSync } = await import('./services/storage');
-            await initializeFirebaseSync(userData);
+        if (user) {
+          const { data: userDoc } = await supabase.from('users').select('*').eq('uid', user.id).single();
+          if (userDoc) {
+            setUser(userDoc as User);
+            const { initializeSupabaseSync } = await import('./services/storage');
+            await initializeSupabaseSync(userDoc as User);
           } else {
-            console.warn("User profile not found in Firestore.");
+            console.warn("User profile not found in Supabase.");
             setUser(null);
+            const { logout } = await import('./services/authService');
             await logout();
           }
         } else {
-          // User is signed out
           setUser(null);
         }
       } catch (error) {
-        console.error("Error fetching user profile:", error);
+        console.error("Auth state change error:", error);
         setUser(null);
       } finally {
-        setLoading(false);
       }
     });
 
-    return () => unsubscribe();
+    return () => subscription.unsubscribe();
   }, []);
 
   const handleLogin = (loggedInUser: User) => {

@@ -189,7 +189,7 @@ const PrincipalDashboard: React.FC<Props> = ({ currentPage = 'dashboard' }) => {
     setEditingId(user.uid);
     setFormError('');
     setTeacherName(user.name);
-    setTeacherID(user.schoolID);
+    setTeacherID(user.loginId);
     setTeacherPassword(user.password || '');
     
     const { pGrade, pSection } = parseClassString(user.assignedClass || '');
@@ -223,7 +223,7 @@ const PrincipalDashboard: React.FC<Props> = ({ currentPage = 'dashboard' }) => {
     }
 
     // Duplicate Check
-    const isDuplicate = users.some(u => u.schoolID === teacherID && u.uid !== editingId);
+    const isDuplicate = users.some(u => u.loginId === teacherID && u.uid !== editingId);
     if (isDuplicate) {
         setFormError("School ID already exists. Please use a unique ID.");
         return;
@@ -258,7 +258,7 @@ const PrincipalDashboard: React.FC<Props> = ({ currentPage = 'dashboard' }) => {
       const updatedUser: User = {
          ...users.find(u => u.uid === editingId)!,
          name: teacherName,
-         schoolID: teacherID,
+         loginId: teacherID,
          password: teacherPassword,
          assignedClass: fullClass,
          assignedSubject: teacherSubject,
@@ -270,6 +270,9 @@ const PrincipalDashboard: React.FC<Props> = ({ currentPage = 'dashboard' }) => {
          contactNumber: teacherContact,
          // Ensure School Name is consistent
          schoolName: currentUser.schoolName,
+      schoolID: currentUser.schoolID,
+      
+      
          avatarUrl: `https://ui-avatars.com/api/?name=${encodeURIComponent(teacherName)}&background=8b5cf6&color=fff`
       };
       updateUser(updatedUser);
@@ -278,7 +281,7 @@ const PrincipalDashboard: React.FC<Props> = ({ currentPage = 'dashboard' }) => {
       const newUser: User = {
         uid: generateId('u'),
         name: teacherName,
-        schoolID: teacherID,
+        loginId: teacherID,
         role: UserRole.TEACHER,
         password: teacherPassword,
         assignedClass: fullClass,
@@ -291,10 +294,13 @@ const PrincipalDashboard: React.FC<Props> = ({ currentPage = 'dashboard' }) => {
         contactNumber: teacherContact,
         // Auto assign Principal's school
         schoolName: currentUser.schoolName,
+      schoolID: currentUser.schoolID,
+      
+      
         avatarUrl: `https://ui-avatars.com/api/?name=${encodeURIComponent(teacherName)}&background=8b5cf6&color=fff`
       };
       addUser(newUser);
-      setAlertState({ isOpen: true, message: `Teacher Added! Login ID: ${newUser.schoolID}` });
+      setAlertState({ isOpen: true, message: `Teacher Added! Login ID: ${newUser.loginId}` });
     }
     setUsers(getStoredUsers());
     setShowAddTeacher(false);
@@ -345,7 +351,9 @@ const PrincipalDashboard: React.FC<Props> = ({ currentPage = 'dashboard' }) => {
       date: new Date().toISOString().split('T')[0],
       audience: annAudience,
       author: 'Principal',
-      schoolName: currentUser.schoolName // Automatically tag with principal's school
+      schoolName: currentUser.schoolName,
+      schoolID: currentUser.schoolID,
+      
     };
     addAnnouncement(newAnn);
     
@@ -666,7 +674,7 @@ const PrincipalDashboard: React.FC<Props> = ({ currentPage = 'dashboard' }) => {
                                                 <td className="px-10 py-6">
                                                     <div className="font-black text-slate-900 dark:text-white tracking-tight text-base group-hover:text-blue-500 transition-colors">{student.name}</div>
                                                 </td>
-                                                <td className="px-10 py-6 font-mono text-[10px] font-black uppercase tracking-widest text-slate-400">{student.schoolID}</td>
+                                                <td className="px-10 py-6 font-mono text-[10px] font-black uppercase tracking-widest text-slate-400">{student.loginId}</td>
                                                 <td className="px-10 py-6 text-center">
                                                     {status === true ? (
                                                         <span className="inline-flex items-center gap-2 px-4 py-1.5 bg-green-500/10 text-green-500 rounded-xl text-[10px] font-black uppercase tracking-widest border border-green-500/20">
@@ -841,6 +849,9 @@ const PrincipalDashboard: React.FC<Props> = ({ currentPage = 'dashboard' }) => {
     const newPayment: PaymentRecord = {
       id: generateId('pay'),
       schoolName: currentUser.schoolName,
+      schoolID: currentUser.schoolID,
+      
+      
       principalUid: currentUser.uid,
       principalName: currentUser.name,
       amount: amountDue,
@@ -1061,7 +1072,7 @@ const PrincipalDashboard: React.FC<Props> = ({ currentPage = 'dashboard' }) => {
                       </td>
                       <td className="px-10 py-6">
                         <span className="font-mono text-xs font-black text-slate-500 dark:text-slate-400 bg-slate-50 dark:bg-slate-800/50 px-3 py-1.5 rounded-xl border border-slate-100 dark:border-slate-800">
-                          {t.schoolID}
+                          {t.loginId}
                         </span>
                       </td>
                       <td className="px-10 py-6">
@@ -1481,7 +1492,7 @@ const PrincipalDashboard: React.FC<Props> = ({ currentPage = 'dashboard' }) => {
                             <img src={t.avatarUrl} className="w-10 h-10 rounded-xl object-cover ring-2 ring-white dark:ring-slate-900 shadow-sm" />
                             <div>
                               <span className="font-black text-slate-900 dark:text-white block text-sm tracking-tight group-hover:text-blue-500 transition-colors">{t.name}</span>
-                              <span className="text-[10px] text-slate-500 font-mono">{t.schoolID}</span>
+                              <span className="text-[10px] text-slate-500 font-mono">{t.loginId}</span>
                             </div>
                           </div>
                         </td>
