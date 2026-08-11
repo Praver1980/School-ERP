@@ -1,6 +1,6 @@
 import { User, UserRole, StudentRecord, Announcement, ERPDatabase, School, SchoolConfig, Assignment, Message } from '../types';
 import { SCHOOL_NAMES } from '../constants';
-import { collection, collectionGroup, doc, setDoc, deleteDoc, getDocs, onSnapshot } from 'firebase/firestore';
+import { collection, collectionGroup, doc, setDoc, deleteDoc, getDocs, onSnapshot, query, where } from 'firebase/firestore';
 import { db } from './firebase';
 
 const generateSyntheticEmailForStorage = (id: string): string => {
@@ -13,15 +13,13 @@ const deleteAuthUser = (id: string) => {
   fetch(`/api/auth/users?email=${encodeURIComponent(email)}`, { method: 'DELETE' }).catch(console.error);
 };
 
-
 const STORAGE_KEY_USERS = 'nexus_erp_users_v2';
 const STORAGE_KEY_STUDENTS = 'nexus_erp_students_v2';
 const STORAGE_KEY_ANNOUNCEMENTS = 'nexus_erp_announcements_v1';
-const STORAGE_KEY_SCHOOLS = 'nexus_erp_schools_v2'; // Version bump for config
+const STORAGE_KEY_SCHOOLS = 'nexus_erp_schools_v2'; 
 const STORAGE_KEY_ASSIGNMENTS = 'nexus_erp_assignments_v1';
 const STORAGE_KEY_MESSAGES = 'nexus_erp_messages_v1';
 const STORAGE_KEY_PAYMENTS = 'nexus_erp_payments_v1';
-
 
 const getRecognizableId = (name: string, id: string) => {
   const safeName = (name || 'Unknown').replace(/[^a-zA-Z0-9]/g, '_');
@@ -50,35 +48,36 @@ const INITIAL_USERS: User[] = [
   }
 ];
 
+export const initializeFirebaseSync = async (user: User | null = null) => {
+  if (!user) return; // Only sync if logged in
 
-export const initializeFirebaseSync = async () => {
+  const isSupremeAdmin = user.role === UserRole.SUPREME_ADMIN;
+  
+  // Use queries based on role
+  const createQuery = (colName: string) => {
+    return isSupremeAdmin ? collection(db, colName) : query(collection(db, colName), where('schoolName', '==', user.schoolName || user.schoolID));
+  };
+  
+  // Specifically for schools
+  const schoolsQuery = isSupremeAdmin ? collection(db, 'schools') : query(collection(db, 'schools'), where('name', '==', user.schoolName));
+
   const collections = [
-    { name: 'announcements', key: STORAGE_KEY_ANNOUNCEMENTS },
-    { name: 'schools', key: STORAGE_KEY_SCHOOLS },
-    { name: 'assignments', key: STORAGE_KEY_ASSIGNMENTS },
-    { name: 'messages', key: STORAGE_KEY_MESSAGES },
-    { name: 'payments', key: STORAGE_KEY_PAYMENTS }
+    { name: 'announcements', key: STORAGE_KEY_ANNOUNCEMENTS, query: createQuery('announcements') },
+    { name: 'schools', key: STORAGE_KEY_SCHOOLS, query: schoolsQuery },
+    { name: 'assignments', key: STORAGE_KEY_ASSIGNMENTS, query: createQuery('assignments') },
+    { name: 'messages', key: STORAGE_KEY_MESSAGES, query: collection(db, 'messages') }, // Messages handled separately or globally depending on rules
+    { name: 'payments', key: STORAGE_KEY_PAYMENTS, query: createQuery('payments') }
   ];
 
   const syncPromises = collections.map(col => {
     return new Promise<void>((resolve) => {
-      onSnapshot(collection(db, col.name), async (snap) => {
+      onSnapshot(col.query, async (snap) => {
         if (!snap.empty) {
           const data = snap.docs.map(d => d.data());
           localStorage.setItem(col.key, JSON.stringify(data));
           window.dispatchEvent(new Event('nexus_data_changed'));
           resolve(); 
         } else {
-          const localData = localStorage.getItem(col.key);
-          if (localData) {
-            const parsed = JSON.parse(localData);
-            for (const item of parsed) {
-              const id = item.uid || item.id;
-              if (id) {
-                await setDoc(doc(db, col.name, id), item).catch(console.error);
-              }
-            }
-          }
           resolve();
         }
       }, (error) => {
@@ -102,13 +101,12 @@ export const initializeFirebaseSync = async () => {
 
   const rolePromises = userRoles.map(role => {
     return new Promise<void>((resolve) => {
-      onSnapshot(collectionGroup(db, role), (snap) => {
+      const q = isSupremeAdmin ? collectionGroup(db, role) : collection(db, 'schools', user.schoolID, role);
+      onSnapshot(q, (snap) => {
         const newData = snap.docs.map(d => d.data());
-        // Filter out existing users of this role, then add new ones
         allUsers = allUsers.filter(u => u.role !== role.replace('principals', 'principal').replace('teachers', 'teacher').replace('admins', 'supreme_admin').replace('users', 'student'));
         allUsers = [...allUsers, ...newData];
         
-        // Remove duplicates just in case
         const uniqueUsers = Array.from(new Map(allUsers.map(item => [item.uid, item])).values());
         allUsers = uniqueUsers;
         
@@ -122,7 +120,8 @@ export const initializeFirebaseSync = async () => {
   });
 
   const studentPromise = new Promise<void>((resolve) => {
-    onSnapshot(collectionGroup(db, 'students'), (snap) => {
+    const q = isSupremeAdmin ? collectionGroup(db, 'students') : collection(db, 'schools', user.schoolID, 'students');
+    onSnapshot(q, (snap) => {
       allStudents = snap.docs.map(d => d.data());
       if (allStudents.length > 0) {
         localStorage.setItem(STORAGE_KEY_STUDENTS, JSON.stringify(allStudents));
@@ -191,6 +190,7 @@ export const addUser = (user: User): void => {
   localStorage.setItem(STORAGE_KEY_USERS, JSON.stringify(users));
   const recId = getRecognizableId(user.name, user.uid);
   setDoc(doc(db, 'schools', user.schoolID || 'global', getRoleCollection(user.role), recId), user).catch(console.error);
+  setDoc(doc(db, 'users', user.uid), user).catch(console.error);
 };
 
 export const updateUser = (updatedUser: User): void => {
@@ -201,6 +201,7 @@ export const updateUser = (updatedUser: User): void => {
     localStorage.setItem(STORAGE_KEY_USERS, JSON.stringify(users));
     const recId = getRecognizableId(updatedUser.name, updatedUser.uid);
     setDoc(doc(db, 'schools', updatedUser.schoolID || 'global', getRoleCollection(updatedUser.role), recId), updatedUser).catch(console.error);
+    setDoc(doc(db, 'users', updatedUser.uid), updatedUser).catch(console.error);
   }
 };
 
@@ -241,13 +242,9 @@ export const addStudent = (student: StudentRecord): void => {
   students.push(student);
   localStorage.setItem(STORAGE_KEY_STUDENTS, JSON.stringify(students));
   const recId = getRecognizableId(student.name, student.id);
-  const teacher = getTeacherForStudent(student);
-  if (teacher) {
-    const teacherRecId = getRecognizableId(teacher.name, teacher.uid);
-    setDoc(doc(db, 'schools', student.schoolID || 'global', 'teachers', teacherRecId, 'students', recId), student).catch(console.error);
-  } else {
-    setDoc(doc(db, 'schools', student.schoolID || 'global', 'students', recId), student).catch(console.error);
-  }
+  
+  setDoc(doc(db, 'schools', student.schoolID || 'global', 'students', recId), student).catch(console.error);
+  
   // Auto-calculate roll numbers for the class
   recalculateRollNumbers(student.className);
 };
@@ -261,13 +258,8 @@ export const updateStudent = (updatedStudent: StudentRecord): void => {
     students[index] = updatedStudent;
     localStorage.setItem(STORAGE_KEY_STUDENTS, JSON.stringify(students));
     const recId = getRecognizableId(updatedStudent.name, updatedStudent.id);
-    const teacher = getTeacherForStudent(updatedStudent);
-    if (teacher) {
-      const teacherRecId = getRecognizableId(teacher.name, teacher.uid);
-      setDoc(doc(db, 'schools', updatedStudent.schoolID || 'global', 'teachers', teacherRecId, 'students', recId), updatedStudent).catch(console.error);
-    } else {
-      setDoc(doc(db, 'schools', updatedStudent.schoolID || 'global', 'students', recId), updatedStudent).catch(console.error);
-    }
+    
+    setDoc(doc(db, 'schools', updatedStudent.schoolID || 'global', 'students', recId), updatedStudent).catch(console.error);
     
     // Recalculate for new class
     recalculateRollNumbers(updatedStudent.className);
@@ -288,14 +280,10 @@ export const removeStudent = (studentId: string): void => {
         const newList = students.filter(s => s.id !== studentId);
         localStorage.setItem(STORAGE_KEY_STUDENTS, JSON.stringify(newList));
         const recId = getRecognizableId(student.name, student.id);
-        const teacher = getTeacherForStudent(student);
-        if (teacher) {
-          const teacherRecId = getRecognizableId(teacher.name, teacher.uid);
-          deleteDoc(doc(db, 'schools', student.schoolID || 'global', 'teachers', teacherRecId, 'students', recId)).catch(console.error);
-        } else {
-          deleteDoc(doc(db, 'schools', student.schoolID || 'global', 'students', recId)).catch(console.error);
-        }
-        deleteDoc(doc(db, 'students', studentId)).catch(console.error);
+        
+        deleteDoc(doc(db, 'schools', student.schoolID || 'global', 'students', recId)).catch(console.error);
+        deleteDoc(doc(db, 'users', studentId)).catch(console.error);
+        
         deleteAuthUser(studentId);
         const messages = getStoredMessages().filter(m => m.senderId === studentId || m.receiverId === studentId);
         messages.forEach(m => deleteMessage(m.id));
@@ -308,13 +296,7 @@ export const saveAllStudents = (students: StudentRecord[]): void => {
   localStorage.setItem(STORAGE_KEY_STUDENTS, JSON.stringify(students));
   students.forEach(s => {
     const recId = getRecognizableId(s.name, s.id);
-    const teacher = getTeacherForStudent(s);
-    if (teacher) {
-      const teacherRecId = getRecognizableId(teacher.name, teacher.uid);
-      setDoc(doc(db, 'schools', s.schoolID || 'global', 'teachers', teacherRecId, 'students', recId), s).catch(console.error);
-    } else {
-      setDoc(doc(db, 'schools', s.schoolID || 'global', 'students', recId), s).catch(console.error);
-    }
+    setDoc(doc(db, 'schools', s.schoolID || 'global', 'students', recId), s).catch(console.error);
   });
 };
 

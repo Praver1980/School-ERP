@@ -13,6 +13,10 @@ import { User, UserRole } from './types';
 import { logout } from './services/authService';
 import { Menu } from 'lucide-react';
 
+import { onAuthStateChanged } from 'firebase/auth';
+import { doc, getDoc } from 'firebase/firestore';
+import { auth, db } from './services/firebase';
+
 function App() {
   const [user, setUser] = useState<User | null>(null);
   const [showPreview, setShowPreview] = useState(false);
@@ -26,7 +30,6 @@ function App() {
   });
 
   useEffect(() => {
-    // Apply theme to document
     if (theme === 'dark') {
       document.documentElement.classList.add('dark');
     } else {
@@ -40,32 +43,44 @@ function App() {
   };
 
   useEffect(() => {
-    const initApp = async () => {
-      // Initialize Firebase sync (loads data from Firestore if present, else seeds it)
-      const { initializeFirebaseSync } = await import('./services/storage');
-      await initializeFirebaseSync();
-
-      // Check local storage for persistent session
-      const storedUser = localStorage.getItem('nexus_user');
-      if (storedUser) {
-        setUser(JSON.parse(storedUser));
+    const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
+      try {
+        if (firebaseUser) {
+          // User is signed in, fetch profile
+          const userDoc = await getDoc(doc(db, 'users', firebaseUser.uid));
+          if (userDoc.exists()) {
+            const userData = userDoc.data() as User;
+            setUser(userData);
+            const { initializeFirebaseSync } = await import('./services/storage');
+            await initializeFirebaseSync(userData);
+          } else {
+            console.warn("User profile not found in Firestore.");
+            setUser(null);
+            await logout();
+          }
+        } else {
+          // User is signed out
+          setUser(null);
+        }
+      } catch (error) {
+        console.error("Error fetching user profile:", error);
+        setUser(null);
+      } finally {
+        setLoading(false);
       }
-      setLoading(false);
-    };
+    });
 
-    initApp();
+    return () => unsubscribe();
   }, []);
 
   const handleLogin = (loggedInUser: User) => {
     setUser(loggedInUser);
-    localStorage.setItem('nexus_user', JSON.stringify(loggedInUser));
     setCurrentPage('dashboard');
   };
 
   const handleLogout = async () => {
     await logout();
     setUser(null);
-    localStorage.removeItem('nexus_user');
   };
 
   const handleNavigate = (page: string) => {
