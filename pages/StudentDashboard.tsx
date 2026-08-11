@@ -1227,7 +1227,7 @@ const StudentDashboard: React.FC<StudentDashboardProps> = ({ user, currentPage =
           </div>
           
           <div className="space-y-3 flex-1 overflow-y-auto pr-2 scrollbar-hide">
-            {studentProfile?.marks?.slice(0, 4).map((item, idx) => {
+            {studentProfile?.marks?.slice(0, 4)?.map((item, idx) => {
                 const score = (item.midTerm + item.final) / 2;
                 const grade = calculateGrade(score);
                 const isPassing = score >= 60;

@@ -872,7 +872,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ currentPage = 'dashboar
                                     <td className="px-6 py-4 text-slate-600 dark:text-slate-300">{s.config?.maxMarks || 100}</td>
                                     <td className="px-6 py-4 text-slate-600 dark:text-slate-300 text-sm">
                                         <div className="flex gap-1 flex-wrap">
-                                            {s.config?.houseNames.map((h, i) => (
+                                            {s.config?.houseNames?.map((h, i) => (
                                                 <span key={i} className="px-2 py-0.5 bg-slate-100 dark:bg-slate-800 rounded border border-slate-200 dark:border-slate-700 text-xs">{h}</span>
                                             )) || <span className="text-slate-400 italic">Default</span>}
                                         </div>

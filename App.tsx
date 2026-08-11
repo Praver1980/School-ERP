@@ -54,7 +54,6 @@ function App() {
           } else {
             console.warn("User profile not found in Supabase.");
             setUser(null);
-            const { logout } = await import('./services/authService');
             await logout();
           }
         } else {
@@ -64,6 +63,7 @@ function App() {
         console.error("Auth state change error:", error);
         setUser(null);
       } finally {
+        setLoading(false);
       }
     });
 
