@@ -1,0 +1,91 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
+    <meta name="theme-color" content="#0f172a" />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <title>Nexus ERP - School Management System</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
+    <style>
+      :root {
+        /* Base Scale for Standard 1080p Windows Displays */
+        font-size: 16px;
+        /* Native System UI Theme Support */
+        color-scheme: light dark;
+        --sat: env(safe-area-inset-top, 0px);
+        --sab: env(safe-area-inset-bottom, 0px);
+      }
+
+      /* Ultra Widescreen & 4K Windows PCs */
+      @media (min-width: 2560px) {
+        :root {
+          font-size: 20px;
+        }
+      }
+
+      /* Standard 2K Windows Displays (2560x1440) */
+      @media (min-width: 1920px) and (max-width: 2559px) {
+        :root {
+          font-size: 17px;
+        }
+      }
+
+      /* Standard Laptops & PCs (1366px - 1600px) */
+      @media (min-width: 1280px) and (max-width: 1919px) {
+        :root {
+          font-size: 15px;
+        }
+      }
+
+      /* Small Laptops & Tablets Landscape */
+      @media (min-width: 769px) and (max-width: 1279px) {
+        :root {
+          font-size: 14.5px;
+        }
+      }
+
+      /* Android Phones - Tall Aspect Ratio (e.g. 19.5:9 / 20:9) */
+      @media (max-width: 768px) {
+        :root {
+          font-size: 14px;
+        }
+      }
+
+      /* Ultra Compact Mobile Phones */
+      @media (max-width: 380px) {
+        :root {
+          font-size: 13px;
+        }
+      }
+
+      body {
+        font-family: 'Inter', system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+        background-color: #f8f9fa;
+        font-size: 1rem;
+        -webkit-tap-highlight-color: transparent;
+        touch-action: manipulation;
+        overscroll-behavior-y: none;
+      }
+    </style>
+  <script type="importmap">
+{
+  "imports": {
+    "react/": "https://esm.sh/react@^19.2.4/",
+    "react": "https://esm.sh/react@^19.2.4",
+    "react-dom/": "https://esm.sh/react-dom@^19.2.4/",
+    "lucide-react": "https://esm.sh/lucide-react@^0.563.0",
+    "recharts": "https://esm.sh/recharts@^3.7.0",
+    "@microsoft/microsoft-graph-client": "https://esm.sh/@microsoft/microsoft-graph-client@^3.0.7",
+    "@azure/msal-browser": "https://esm.sh/@azure/msal-browser@^5.1.0"
+  }
+}
+</script>
+<link rel="stylesheet" href="/index.css">
+</head>
+  <body>
+    <div id="root"></div>
+  <script type="module" src="/index.tsx"></script>
+</body>
+</html>

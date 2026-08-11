@@ -1,0 +1,6 @@
+{
+  "name": "School ERP System v2",
+  "description": "A secure, role-based School ERP system featuring School ID login with synthetic email mapping, role-specific dashboards, and streamlined attendance tools.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

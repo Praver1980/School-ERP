@@ -1,0 +1,41 @@
+{
+  "entities": {
+    "user": {
+      "title": "User",
+      "description": "A user in the system",
+      "type": "object",
+      "properties": {
+        "uid": { "type": "string" },
+        "schoolID": { "type": "string" },
+        "name": { "type": "string" },
+        "role": { "type": "string" }
+      }
+    }
+  },
+  "firestore": {
+    "users/{userId}": {
+      "schema": "user",
+      "description": "Users"
+    },
+    "students/{studentId}": {
+      "schema": "student",
+      "description": "Students"
+    },
+    "announcements/{annId}": {
+      "schema": "announcement",
+      "description": "Announcements"
+    },
+    "schools/{schoolId}": {
+      "schema": "school",
+      "description": "Schools"
+    },
+    "assignments/{assignId}": {
+      "schema": "assignment",
+      "description": "Assignments"
+    },
+    "messages/{messageId}": {
+      "schema": "message",
+      "description": "Messages"
+    }
+  }
+}
